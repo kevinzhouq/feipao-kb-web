@@ -1,0 +1,14 @@
+{
+  "name": "feipao-kb-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:data": "python scripts/build_kb.py",
+    "start": "node server.mjs",
+    "test": "node tests/search.test.mjs && node tests/api.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

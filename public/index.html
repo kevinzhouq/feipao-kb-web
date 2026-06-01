@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>飞跑知识库</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="login-view" id="loginView" hidden>
+        <div class="brand-mark">飞</div>
+        <h1>飞跑知识库</h1>
+        <p>内部客服查询工具</p>
+        <form id="loginForm" class="login-form">
+          <input id="passwordInput" type="password" autocomplete="current-password" placeholder="输入访问密码">
+          <button type="submit">进入查询</button>
+        </form>
+        <p class="error-text" id="loginError" role="alert"></p>
+      </section>
+
+      <section class="search-view" id="searchView" hidden>
+        <header class="topbar">
+          <div>
+            <strong>飞跑知识库</strong>
+            <span id="recordHint">客服标准问答</span>
+          </div>
+          <button class="ghost-button" id="logoutButton" type="button">退出</button>
+        </header>
+
+        <div class="search-panel">
+          <label class="search-box">
+            <span>搜索</span>
+            <input id="searchInput" type="search" placeholder="输入问题关键词，如 下载、成绩、照片">
+          </label>
+          <div class="category-row" id="categoryRow"></div>
+        </div>
+
+        <div class="result-meta" id="resultMeta">输入关键词开始查询</div>
+        <div class="results" id="results"></div>
+        <div class="empty-state" id="emptyState" hidden>没有匹配结果，换个关键词试试。</div>
+      </section>
+    </main>
+    <div class="toast" id="toast" hidden>已复制</div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -154,6 +154,29 @@ input {
   padding: 8px 12px;
 }
 
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg);
+}
+
+.mode-tab {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--muted);
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.mode-tab.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
 .search-panel {
   position: sticky;
   top: 65px;
@@ -288,6 +311,107 @@ input {
   color: white;
   padding: 9px 16px;
   font-size: 14px;
+}
+
+.complaint-mode {
+  padding: 12px 16px 32px;
+}
+
+.complaint-lock,
+.complaint-form,
+.draft-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 16px;
+}
+
+.complaint-lock h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.complaint-lock p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.compact-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.compact-form input,
+.compact-form button,
+.complaint-form input,
+.complaint-form select,
+.complaint-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+}
+
+.compact-form input,
+.compact-form button,
+.complaint-form input,
+.complaint-form select {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.compact-form button {
+  border: 0;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+}
+
+.complaint-form {
+  display: grid;
+  gap: 12px;
+}
+
+.complaint-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.complaint-form label span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.complaint-form textarea {
+  resize: vertical;
+  padding: 10px 12px;
+  line-height: 1.6;
+}
+
+.field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.draft-panel {
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.draft-panel h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
 }
 
 @media (min-width: 720px) {

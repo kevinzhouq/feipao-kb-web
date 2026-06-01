@@ -28,17 +28,81 @@
           <button class="ghost-button" id="logoutButton" type="button">退出</button>
         </header>
 
-        <div class="search-panel">
+        <nav class="mode-tabs" aria-label="功能切换">
+          <button class="mode-tab active" type="button" data-mode="knowledge">知识库</button>
+          <button class="mode-tab" type="button" data-mode="complaints">客诉记录</button>
+        </nav>
+
+        <div class="knowledge-mode" id="knowledgeMode">
+          <div class="search-panel">
           <label class="search-box">
             <span>搜索</span>
             <input id="searchInput" type="search" placeholder="输入问题关键词，如 下载、成绩、照片">
           </label>
           <div class="category-row" id="categoryRow"></div>
+          </div>
+
+          <div class="result-meta" id="resultMeta">输入关键词开始查询</div>
+          <div class="results" id="results"></div>
+          <div class="empty-state" id="emptyState" hidden>没有匹配结果，换个关键词试试。</div>
         </div>
 
-        <div class="result-meta" id="resultMeta">输入关键词开始查询</div>
-        <div class="results" id="results"></div>
-        <div class="empty-state" id="emptyState" hidden>没有匹配结果，换个关键词试试。</div>
+        <div class="complaint-mode" id="complaintMode" hidden>
+          <section class="complaint-lock" id="complaintLock">
+            <h2>客诉记录</h2>
+            <p>客诉信息包含手机号、订单号等敏感内容，需要二次验证。</p>
+            <form id="complaintLoginForm" class="compact-form">
+              <input id="complaintPasswordInput" type="password" placeholder="输入客诉模块密码">
+              <button type="submit">进入客诉记录</button>
+            </form>
+            <p class="error-text" id="complaintLoginError" role="alert"></p>
+          </section>
+
+          <form class="complaint-form" id="complaintForm" hidden>
+            <label>
+              <span>类型</span>
+              <select id="complaintType" name="type"></select>
+            </label>
+            <label>
+              <span>问题描述 *</span>
+              <textarea id="complaintDescription" name="description" rows="5" placeholder="粘贴或输入客户原始反馈"></textarea>
+            </label>
+            <div class="field-grid">
+              <label>
+                <span>号牌信息</span>
+                <input id="complaintBib" name="bibNumber" placeholder="如 A13576">
+              </label>
+              <label>
+                <span>订单号</span>
+                <input id="complaintOrder" name="orderNo" placeholder="退款或重复购买时填写">
+              </label>
+            </div>
+            <label>
+              <span>截图/附件说明</span>
+              <input id="complaintAttachment" name="attachmentNote" placeholder="如截图已发群内，或附件名称">
+            </label>
+            <div class="field-grid">
+              <label>
+                <span>处理对接人</span>
+                <input id="complaintOwner" name="owner" placeholder="负责人">
+              </label>
+              <label>
+                <span>处理进度</span>
+                <input id="complaintProgress" name="progress" placeholder="待处理">
+              </label>
+            </div>
+            <label>
+              <span>备注</span>
+              <textarea id="complaintNote" name="note" rows="3" placeholder="内部备注，不建议写入无关隐私"></textarea>
+            </label>
+            <div class="form-actions">
+              <button class="ghost-button" id="draftButton" type="button">AI整理</button>
+              <button class="copy-button" type="submit">提交到飞书</button>
+            </div>
+            <section class="draft-panel" id="draftPanel" hidden></section>
+            <p class="result-meta" id="complaintStatus"></p>
+          </form>
+        </div>
       </section>
     </main>
     <div class="toast" id="toast" hidden>已复制</div>

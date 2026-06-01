@@ -3,12 +3,23 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  appendAuditLine,
+  buildComplaintSubmission,
+  complaintTypes,
+  createComplaintDraft,
+  normalizeComplaint,
+  validateComplaint,
+  writeComplaintToFeishu
+} from "./complaints.mjs";
 import { searchKnowledgeBase } from "./search.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
 const dataPath = path.resolve(__dirname, process.env.KB_DATA_PATH || "./data/kb.json");
+const complaintDataPath = path.resolve(__dirname, process.env.COMPLAINT_DATA_PATH || "./data/complaints.jsonl");
 const password = process.env.AUTH_PASSWORD || "feipao-demo";
+const complaintPassword = process.env.COMPLAINT_PASSWORD || password;
 const sessionSecret = process.env.SESSION_SECRET || "dev-secret-change-me";
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "0.0.0.0";
@@ -23,6 +34,12 @@ function sign(value) {
 function makeSession() {
   const expires = Math.floor(Date.now() / 1000) + maxAge;
   const value = `feipao:${expires}`;
+  return `${value}.${sign(value)}`;
+}
+
+function makeComplaintSession() {
+  const expires = Math.floor(Date.now() / 1000) + maxAge;
+  const value = `complaint:${expires}`;
   return `${value}.${sign(value)}`;
 }
 
@@ -41,6 +58,19 @@ function isAuthed(request) {
   const signature = token.slice(lastDot + 1);
   const expires = Number(value.split(":").at(-1));
   return expires > Math.floor(Date.now() / 1000) && signature === sign(value);
+}
+
+function isComplaintAuthed(request) {
+  const token = parseCookies(request.headers.cookie).fp_complaint_session;
+  if (!token) return false;
+  const lastDot = token.lastIndexOf(".");
+  if (lastDot < 0) return false;
+  const value = token.slice(0, lastDot);
+  const signature = token.slice(lastDot + 1);
+  const expires = Number(value.split(":").at(-1));
+  return value.startsWith("complaint:")
+    && expires > Math.floor(Date.now() / 1000)
+    && signature === sign(value);
 }
 
 async function readBody(request) {
@@ -109,7 +139,7 @@ async function handleApi(request, response, url) {
   }
 
   if (url.pathname === "/api/me") {
-    sendJson(response, 200, { authed: isAuthed(request) });
+    sendJson(response, 200, { authed: isAuthed(request), complaintAuthed: isComplaintAuthed(request) });
     return;
   }
 
@@ -130,6 +160,72 @@ async function handleApi(request, response, url) {
       total: results.length,
       results
     });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/complaints/login") {
+    const body = JSON.parse(await readBody(request) || "{}");
+    if (body.password !== complaintPassword) {
+      sendJson(response, 401, { error: "客诉模块密码不正确" });
+      return;
+    }
+    sendJson(response, 200, { ok: true }, {
+      "set-cookie": `fp_complaint_session=${makeComplaintSession()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/complaints/meta") {
+    sendJson(response, 200, { types: complaintTypes, authed: isComplaintAuthed(request) });
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/complaints") && !isComplaintAuthed(request)) {
+    sendJson(response, 401, { error: "请先通过客诉模块验证" });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/complaints/draft") {
+    const record = normalizeComplaint(JSON.parse(await readBody(request) || "{}"));
+    const errors = validateComplaint(record);
+    if (Object.keys(errors).length) {
+      sendJson(response, 400, { error: "表单校验失败", errors });
+      return;
+    }
+    const draft = await createComplaintDraft(record);
+    sendJson(response, 200, { draft });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/complaints") {
+    const body = JSON.parse(await readBody(request) || "{}");
+    const record = normalizeComplaint(body.record || body);
+    const errors = validateComplaint(record);
+    if (Object.keys(errors).length) {
+      sendJson(response, 400, { error: "表单校验失败", errors });
+      return;
+    }
+
+    const submission = buildComplaintSubmission(record, body.draft || null);
+    await appendAuditLine(complaintDataPath, { event: "received", ...submission });
+    try {
+      const writerResult = await writeComplaintToFeishu(submission);
+      await appendAuditLine(complaintDataPath, {
+        event: "writer_result",
+        id: submission.id,
+        createdAt: new Date().toISOString(),
+        writerResult
+      });
+      sendJson(response, 200, { ok: true, complaint: submission, writerResult });
+    } catch (error) {
+      await appendAuditLine(complaintDataPath, {
+        event: "writer_failed",
+        id: submission.id,
+        createdAt: new Date().toISOString(),
+        error: error.message
+      });
+      sendJson(response, 502, { error: "飞书同步失败，记录已进入本地审计队列", complaint: submission });
+    }
     return;
   }
 

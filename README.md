@@ -34,8 +34,9 @@ node server.mjs
 - `COMPLAINT_DATA_PATH`：默认 `./data/complaints.jsonl`
 - `FEISHU_WRITER`：默认 `mock`，配置为 `cli` 后调用飞书 CLI
 - `FEISHU_CLI_PATH`：默认 `lark-cli`
-- `FEISHU_TABLE_TOKEN` / `FEISHU_SHEET_ID`：飞书在线表格目标
-- `FEISHU_CLI_APPEND_ARGS`：飞书 CLI 追加行命令模板
+- `FEISHU_TABLE_URL`：飞书在线表格 URL
+- `FEISHU_SHEET_RANGE`：追加范围，例如 `TLSUzz!A:I`
+- `FEISHU_CLI_AS`：默认 `bot`
 - `DEEPSEEK_API_KEY`：可选，未配置时使用本地规则生成整理建议
 
 部署流程建议：
@@ -69,9 +70,9 @@ node server.mjs
 ```powershell
 $env:FEISHU_WRITER="cli"
 $env:FEISHU_CLI_PATH="lark-cli"
-$env:FEISHU_TABLE_TOKEN="你的表格 token"
-$env:FEISHU_SHEET_ID="你的 sheet id"
-$env:FEISHU_CLI_APPEND_ARGS="请按 lark-cli 实际追加行命令填写，支持 {tableToken} {sheetId} {rowJson} 占位"
+$env:FEISHU_TABLE_URL="https://fqj52sgnffz.feishu.cn/sheets/XsNjsml2ahOWS7t0IuwcjKuSndf?sheet=TLSUzz"
+$env:FEISHU_SHEET_RANGE="TLSUzz!A:I"
+$env:FEISHU_CLI_AS="bot"
 ```
 
 飞书 CLI 需要先按官方流程安装并登录：

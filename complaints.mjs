@@ -121,6 +121,21 @@ export function buildComplaintRow(record) {
   ];
 }
 
+export function buildFeishuAppendArgs(record, env = process.env) {
+  return [
+    "sheets",
+    "+append",
+    "--url",
+    env.FEISHU_TABLE_URL,
+    "--range",
+    env.FEISHU_SHEET_RANGE,
+    "--values",
+    JSON.stringify([buildComplaintRow(record)]),
+    "--as",
+    env.FEISHU_CLI_AS || "bot"
+  ];
+}
+
 function runCli(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], ...options });
@@ -141,23 +156,13 @@ export async function writeComplaintToFeishu(record, env = process.env) {
     return { writer: "mock", externalId: `mock-${record.id}`, status: "skipped" };
   }
 
-  if (!env.FEISHU_TABLE_TOKEN || !env.FEISHU_SHEET_ID) {
-    throw new Error("缺少 FEISHU_TABLE_TOKEN 或 FEISHU_SHEET_ID");
+  if (!env.FEISHU_TABLE_URL || !env.FEISHU_SHEET_RANGE) {
+    throw new Error("缺少 FEISHU_TABLE_URL 或 FEISHU_SHEET_RANGE");
   }
 
   const cli = env.FEISHU_CLI_PATH || "lark-cli";
   const rowJson = JSON.stringify(buildComplaintRow(record));
-  const argsTemplate = env.FEISHU_CLI_APPEND_ARGS;
-  if (!argsTemplate) {
-    throw new Error("缺少 FEISHU_CLI_APPEND_ARGS，请配置 lark-cli 追加表格行命令模板");
-  }
-
-  const args = argsTemplate
-    .replaceAll("{tableToken}", env.FEISHU_TABLE_TOKEN)
-    .replaceAll("{sheetId}", env.FEISHU_SHEET_ID)
-    .replaceAll("{rowJson}", rowJson)
-    .split(" ")
-    .filter(Boolean);
+  const args = buildFeishuAppendArgs(record, env);
 
   const result = await runCli(cli, args);
   return {

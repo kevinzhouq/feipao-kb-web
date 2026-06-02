@@ -1,3 +1,4 @@
 .env
 node_modules/
 preview.*.log
+lark-config.*.log

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import {
+  buildFeishuAppendArgs,
   buildLocalDraft,
   normalizeComplaint,
   validateComplaint
@@ -17,6 +18,19 @@ assert.equal(normalized.bibNumber, "C33578");
 assert.deepEqual(validateComplaint(normalized), {});
 assert.equal(validateComplaint(normalizeComplaint({})).description, "请填写问题描述");
 assert.match(buildLocalDraft(normalized).sensitiveHints.join(","), /手机号/);
+const feishuArgs = buildFeishuAppendArgs(normalized, {
+  FEISHU_TABLE_URL: "https://fqj52sgnffz.feishu.cn/sheets/XsNjsml2ahOWS7t0IuwcjKuSndf?sheet=TLSUzz",
+  FEISHU_SHEET_RANGE: "TLSUzz!A:I",
+  FEISHU_CLI_AS: "bot"
+});
+assert.deepEqual(feishuArgs.slice(0, 6), [
+  "sheets",
+  "+append",
+  "--url",
+  "https://fqj52sgnffz.feishu.cn/sheets/XsNjsml2ahOWS7t0IuwcjKuSndf?sheet=TLSUzz",
+  "--range",
+  "TLSUzz!A:I"
+]);
 
 const port = 8801;
 const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "feipao-complaints-"));

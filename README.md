@@ -38,6 +38,9 @@ node server.mjs
 - `FEISHU_SHEET_RANGE`：追加范围，例如 `TLSUzz!A:I`
 - `FEISHU_CLI_AS`：默认 `bot`
 - `DEEPSEEK_API_KEY`：可选，未配置时使用本地规则生成整理建议
+- `DEEPSEEK_TIMEOUT_MS`：DeepSeek 请求超时，默认 `15000`
+- `FEISHU_CLI_TIMEOUT_MS`：飞书 CLI 写入超时，默认 `20000`
+- `REQUEST_BODY_LIMIT_BYTES`：请求体大小限制，默认 `1048576`
 
 部署流程建议：
 
@@ -46,6 +49,37 @@ node server.mjs
 3. 初始化 Git 仓库并推送到 GitHub。
 4. 云平台连接 GitHub 仓库部署。
 5. 后续更新 Excel 后重新生成 `data/kb.json`，提交并触发部署。
+
+## 国内服务器 PM2 部署
+
+如果部署在腾讯云、阿里云等国内服务器，建议用 PM2 守护 Node 进程，避免服务进程退出后页面长期不可访问。
+
+```bash
+cd /path/to/feipao-kb-web
+npm install
+npm install -g pm2
+mkdir -p /var/lib/feipao-kb
+export NODE_ENV=production
+export AUTH_PASSWORD="你的访问密码"
+export COMPLAINT_PASSWORD="客诉模块二次密码"
+export SESSION_SECRET="一段足够长的随机字符串"
+export COMPLAINT_DATA_PATH="/var/lib/feipao-kb/complaints.jsonl"
+export FEISHU_WRITER="cli"
+export FEISHU_CLI_PATH="lark-cli"
+export FEISHU_TABLE_URL="https://fqj52sgnffz.feishu.cn/sheets/XsNjsml2ahOWS7t0IuwcjKuSndf?sheet=TLSUzz"
+export FEISHU_SHEET_RANGE="TLSUzz!A:I"
+export FEISHU_CLI_AS="bot"
+pm2 start ecosystem.config.cjs --env production
+pm2 save
+pm2 startup
+```
+
+启动后访问：
+
+- 首页：`http://服务器IP:8787`
+- 健康检查：`http://服务器IP:8787/healthz`
+
+`ecosystem.config.cjs` 会开启自动重启、300MB 内存重启阈值，并把日志写到 `logs/`。线上建议把 `COMPLAINT_DATA_PATH` 放到服务器持久目录，例如 `/var/lib/feipao-kb/complaints.jsonl`，不要放在会被部署覆盖的项目目录里。
 
 ## GitHub 同步阶段
 

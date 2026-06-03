@@ -24,6 +24,7 @@ const sessionSecret = process.env.SESSION_SECRET || "dev-secret-change-me";
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "0.0.0.0";
 const maxAge = 60 * 60 * 24 * 7;
+const requestBodyLimitBytes = Number(process.env.REQUEST_BODY_LIMIT_BYTES || 1024 * 1024);
 
 let kbCache;
 
@@ -73,9 +74,21 @@ function isComplaintAuthed(request) {
     && signature === sign(value);
 }
 
+function withStatus(error, status) {
+  error.status = status;
+  return error;
+}
+
 async function readBody(request) {
   const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > requestBodyLimitBytes) {
+      throw withStatus(new Error("请求内容过大"), 413);
+    }
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks).toString("utf-8");
 }
 
@@ -90,6 +103,45 @@ async function loadKb() {
 function sendJson(response, status, payload, headers = {}) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8", ...headers });
   response.end(JSON.stringify(payload));
+}
+
+async function appendComplaintAudit(response, entry) {
+  try {
+    await appendAuditLine(complaintDataPath, entry);
+    return true;
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "本地审计日志写入失败，请检查 COMPLAINT_DATA_PATH",
+      detail: error.message
+    });
+    return false;
+  }
+}
+
+async function sendHealth(response) {
+  try {
+    const raw = await fs.readFile(dataPath, "utf-8");
+    JSON.parse(raw);
+    sendJson(response, 200, {
+      ok: true,
+      uptimeSeconds: Math.round(process.uptime()),
+      nodeVersion: process.version,
+      kb: { readable: true, path: dataPath },
+      env: {
+        feishuWriter: process.env.FEISHU_WRITER || "mock",
+        feishuCliConfigured: Boolean(process.env.FEISHU_CLI_PATH),
+        deepSeekConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
+        complaintDataPathConfigured: Boolean(process.env.COMPLAINT_DATA_PATH)
+      }
+    });
+  } catch (error) {
+    sendJson(response, 503, {
+      ok: false,
+      uptimeSeconds: Math.round(process.uptime()),
+      kb: { readable: false, path: dataPath },
+      error: error.message
+    });
+  }
 }
 
 async function sendStatic(response, pathname) {
@@ -207,23 +259,23 @@ async function handleApi(request, response, url) {
     }
 
     const submission = buildComplaintSubmission(record, body.draft || null);
-    await appendAuditLine(complaintDataPath, { event: "received", ...submission });
+    if (!await appendComplaintAudit(response, { event: "received", ...submission })) return;
     try {
       const writerResult = await writeComplaintToFeishu(submission);
-      await appendAuditLine(complaintDataPath, {
+      if (!await appendComplaintAudit(response, {
         event: "writer_result",
         id: submission.id,
         createdAt: new Date().toISOString(),
         writerResult
-      });
+      })) return;
       sendJson(response, 200, { ok: true, complaint: submission, writerResult });
     } catch (error) {
-      await appendAuditLine(complaintDataPath, {
+      if (!await appendComplaintAudit(response, {
         event: "writer_failed",
         id: submission.id,
         createdAt: new Date().toISOString(),
         error: error.message
-      });
+      })) return;
       sendJson(response, 502, { error: "飞书同步失败，记录已进入本地审计队列", complaint: submission });
     }
     return;
@@ -235,16 +287,38 @@ async function handleApi(request, response, url) {
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    if (url.pathname === "/healthz") {
+      await sendHealth(response);
+      return;
+    }
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
       return;
     }
     await sendStatic(response, url.pathname);
   } catch (error) {
-    sendJson(response, 500, { error: error.message || "服务异常" });
+    sendJson(response, error.status || 500, { error: error.message || "服务异常" });
   }
 });
 
 server.listen(port, host, () => {
   console.log(`Feipao knowledge base running at http://${host}:${port}`);
+  console.log(JSON.stringify({
+    nodeVersion: process.version,
+    host,
+    port,
+    kbDataPath: dataPath,
+    complaintDataPath,
+    feishuWriter: process.env.FEISHU_WRITER || "mock",
+    feishuCliConfigured: Boolean(process.env.FEISHU_CLI_PATH),
+    deepSeekConfigured: Boolean(process.env.DEEPSEEK_API_KEY)
+  }));
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error("Unhandled rejection:", error);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
 });

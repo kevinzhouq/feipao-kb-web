@@ -80,27 +80,42 @@ export async function createComplaintDraft(record, env = process.env) {
     return { provider: "local", ...buildLocalDraft(record) };
   }
 
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.DEEPSEEK_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: env.DEEPSEEK_MODEL || "deepseek-chat",
-      messages: [
-        {
-          role: "system",
-          content: "你是客服客诉记录整理助手。只返回 JSON，字段为 suggestedType, summary, sensitiveHints, handlingSuggestion。不要执行任何外部操作。"
-        },
-        {
-          role: "user",
-          content: JSON.stringify(record, null, 2)
-        }
-      ],
-      response_format: { type: "json_object" }
-    })
-  });
+  const controller = new AbortController();
+  const timeoutMs = Number(env.DEEPSEEK_TIMEOUT_MS || 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response;
+  try {
+    response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.DEEPSEEK_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: env.DEEPSEEK_MODEL || "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: "你是客服客诉记录整理助手。只返回 JSON，字段为 suggestedType, summary, sensitiveHints, handlingSuggestion。不要执行任何外部操作。"
+          },
+          {
+            role: "user",
+            content: JSON.stringify(record, null, 2)
+          }
+        ],
+        response_format: { type: "json_object" }
+      })
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`DeepSeek 请求超时 (${timeoutMs}ms)`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) throw new Error(`DeepSeek 请求失败: ${response.status}`);
   const payload = await response.json();
@@ -138,15 +153,37 @@ export function buildFeishuAppendArgs(record, env = process.env) {
 
 function runCli(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], ...options });
+    const timeoutMs = Number(options.timeoutMs || 20000);
+    const useShell = process.platform === "win32" && /\.(cmd|bat)$/i.test(command);
+    let finished = false;
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: useShell,
+      cwd: options.cwd,
+      env: options.env
+    });
     let stdout = "";
     let stderr = "";
+
+    function settle(callback, value) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      callback(value);
+    }
+
+    const timeout = setTimeout(() => {
+      child.kill();
+      settle(reject, new Error(`飞书 CLI 超时 (${timeoutMs}ms)`));
+    }, timeoutMs);
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      settle(reject, error);
+    });
     child.on("close", (code) => {
-      if (code === 0) resolve({ stdout, stderr });
-      else reject(new Error(stderr || stdout || `CLI exited with ${code}`));
+      if (code === 0) settle(resolve, { stdout, stderr });
+      else settle(reject, new Error(stderr || stdout || `CLI exited with ${code}`));
     });
   });
 }
@@ -164,7 +201,7 @@ export async function writeComplaintToFeishu(record, env = process.env) {
   const rowJson = JSON.stringify(buildComplaintRow(record));
   const args = buildFeishuAppendArgs(record, env);
 
-  const result = await runCli(cli, args);
+  const result = await runCli(cli, args, { timeoutMs: Number(env.FEISHU_CLI_TIMEOUT_MS || 20000) });
   return {
     writer: "cli",
     externalId: crypto.createHash("sha256").update(result.stdout || rowJson).digest("hex").slice(0, 16),

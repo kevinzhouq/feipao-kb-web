@@ -105,6 +105,13 @@ function sendJson(response, status, payload, headers = {}) {
   response.end(JSON.stringify(payload));
 }
 
+function publicErrorDetail(error) {
+  return String(error?.message || error || "未知错误")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer ***")
+    .replace(/authorization:\s*[^\s]+/gi, "authorization: ***")
+    .slice(0, 500);
+}
+
 async function appendComplaintAudit(response, entry) {
   try {
     await appendAuditLine(complaintDataPath, entry);
@@ -276,7 +283,11 @@ async function handleApi(request, response, url) {
         createdAt: new Date().toISOString(),
         error: error.message
       })) return;
-      sendJson(response, 502, { error: "飞书同步失败，记录已进入本地审计队列", complaint: submission });
+      sendJson(response, 502, {
+        error: "飞书同步失败，记录已进入本地审计队列",
+        detail: publicErrorDetail(error),
+        complaint: submission
+      });
     }
     return;
   }

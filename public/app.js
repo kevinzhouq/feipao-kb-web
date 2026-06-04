@@ -50,7 +50,10 @@ async function api(path, options = {}) {
     ...options
   });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error || "请求失败");
+  if (!response.ok) {
+    const detail = body.detail ? `：${body.detail}` : "";
+    throw new Error(`${body.error || "请求失败"}${detail}`);
+  }
   return body;
 }
 

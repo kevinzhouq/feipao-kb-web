@@ -87,6 +87,7 @@ try {
   assert.equal(submit.status, 502);
   const failedPayload = await submit.json();
   assert.match(failedPayload.error, /飞书同步失败/);
+  assert.match(failedPayload.detail, /飞书 CLI 超时/);
 
   const stillHealthy = await fetch(`http://127.0.0.1:${port}/healthz`);
   assert.equal(stillHealthy.status, 200);
